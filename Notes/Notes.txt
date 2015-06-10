@@ -569,7 +569,7 @@ We may have two classes with same name but different XSD name space. We should u
  wsimport -b bindingFile.xml wsdlPath
 
 
-
+This is not a complete tutorial. 
 
 
 
