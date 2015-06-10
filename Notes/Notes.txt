@@ -1,0 +1,575 @@
+01 - Introduction.
+------------------
+A WS is a service provided over a network. A WS is application-level consumption.
+
+02 - WS jargon.
+------------------------
+Let's make an analogy with the POJO world. If we were to consume an implementation of a certain logic, we can call its interface. Example DI.
+The interface is a contract.
+
+For WS we use XML based files as analogy for the interface that the consumer calls (irrespective of the underlying language) to use the WS.
+XML is understood by most languages.
+When we create a WS we share the contract as an XML document, called the WSDL - WS description language.
+The WSDL should not be generated manually - there are tools for that.
+The WSDL contains the methods, arguments and return type as an interface in the POJO world.
+
+The UDDI (Universal Description Discovery Integration) are directories of WSs to access our WSDL for our WSs.
+It is a registry where we can register our WS to be queried by consumers. 
+Any publisher can publish their WSs in the UDDI and the consumer can query the UDDI to access the different WSs.
+
+The arguments and return types provided to the WS and returned by it are normalized so that it is language independent. 
+hence we can't send serialized Java objects as the consumer can be written in a different language.
+This protocol is called SOAP - Simple Object Access Protocol.
+SOAP is a protocol used to encode and decode different messages between the consumer and publisher.
+
+Our objects are converted to SOAP messages by our SEI code - Service End-point Interface. 
+It accesses an interface to our WS end-point. 
+This implies that we have a service interface at the client level which accesses 
+to the WS end point and translates the WS call to as SOAP message, ensuring that the WS understands the message.
+
+We don't have to write the SEI (in Java) and the conversion ourselves.
+
+03 - Writing a WS Client Stub generation
+-------------------------------------------------
+We will be writing a client to a WS. The client calls and consumes the result.
+Example of WSs: http://webservicex.net/ws/WSDetails.aspx?CATID=12&WSID=64
+GeoIPService for example enables you to easily look up countries by IP address / Context. 
+If we pass it an IP it will return the country. We will print the response of the WS on the console.
+
+The WSDL (contract to the SOAP WS): http://webservicex.net/geoipservice.asmx?wsdl
+<wsdl:service name="GeoIPService"> gives the name of the service.
+<wsdl:port name="GeoIPServiceSoap" binding="tns:GeoIPServiceSoap"> gives use the name of the port.
+
+As we saw previously, to consume a WS we require a service end-point interface. We don't write this interface. 
+There are tools in Java to generate the SEI. We have to pass in a WSDL and the tools generate the SEI stub.
+We generate the stub using the Java tool and we call a method on the stub to get the information.The stub internally translates the method call to a call to the WS. 
+Hence the WS details are hidden.
+
+The Java SE wsimport is a tool to generate the service end-point stub.
+> wsimport http://webservicex.net/geoipservice.asmx?wsdl
+This translates the WSDL in Java classes, compiles the classes and deletes the .java source files.
+
+> wsimport -keep -s src http://webservicex.net/geoipservice.asmx?wsdl
+
+The generated classes are use as stubs to access the WS in our Java application.
+
+04 - Writing a WS Client Calling the Service
+-----------------------------------------------------
+We use the WS name and WS port to access to the different methods exposed by the WS.
+
+05 - Setting up Java EE 7 SDK
+------------------------------
+We have to install the Java EE 7 SDK, which typically installs the GlassFish 4 server.
+To start GlassFish server: bin/asadamin start-domain
+To stop  GlassFish server: bin/asadamin stop-domain
+
+06 - Writing a WS Eclipse setup
+-----------------------------------------
+We create a TestMart Dynamic Web Project. Our goal is to create a WS that has a operation called getProductCategories.
+Consumers will send SOAP requests to get product categories and the application returns a SOAP response with the list of categories.
+
+07 - Writing a WS Code and Deploy
+-------------------------------------------
+1. The ProductCatalog class is converted in a WS by annotating it with @WebService
+2. On launching the project, we can see that the Engines for the application is WSs and web in the Applications view in the Admin Console.
+3. On clicking on the name of the project in the Applications view, we have the "View Endpoint" action.
+4. In the WS Endpoint Information view, we have two links and a component called ProductCatalog => The same class that we annotated:
+ - Tester: 	/TestMart/ProductCatalogService?Tester. This is a Tester page provided that GlassFish => We don't have to write a client to test a page.
+ - WSDL: 	/TestMart/ProductCatalogService?wsdl => http://127.0.0.1:8888/TestMart/ProductCatalogService?WSDL
+  Note: The service is not ProductCatalog but ProductCatalogService. The ProductCatalogPort has one operation called getProductCategories.
+ 
+ As we saw we can use the Tester page provided by GlassFish to test our WS. Testers are UIs generated automatically by GlassFish to test our WSs.
+ When we open the ProductCatalogService tester page, we can see all the methods that are provided. If these methods have input parameters, GlassFish enables us to enter values.
+In our case we don't have any parameters for the getProductCategories method. If we click on the method, we open the getProductCategories Method Invocation page.
+We can see the SOAP request done by the client and the SOAP response sent by the getProductCategories() method of the WS.
+
+SOAP Request
+
+    <?xml version="1.0" encoding="UTF-8"?><S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/" xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
+        <SOAP-ENV:Header/>
+        <S:Body>
+            <ns2:getProductCategories xmlns:ns2="http://model.testmart.yovan.com/"/>
+        </S:Body>
+    </S:Envelope>
+
+
+
+As we can see, it returns the three Strings in a java.util.List that are defined in the WS method.
+
+SOAP Response
+
+    <?xml version="1.0" encoding="UTF-8"?><S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/" xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
+        <SOAP-ENV:Header/>
+        <S:Body>
+            <ns2:getProductCategoriesResponse xmlns:ns2="http://model.testmart.yovan.com/">
+                <return>Books</return>
+                <return>Movies</return>
+                <return>Music</return>
+            </ns2:getProductCategoriesResponse>
+        </S:Body>
+    </S:Envelope>
+
+5. We can annotate the WS method with the @WebMethod annotation, but once we annotate a class with @WebService,
+all public methods in that class are operations of a WS.
+
+08 - Adding Input Arguments
+----------------------------
+We added 
+	getProducts(String category) method which is an operation with an argument which returns a list of products by category.
+ 	addProduct(String category, String product) is an operation which adds a product to the list of the specified category.
+Note: When we added a new book, we can see that the book has been added to the list  - can be checked using getProducts("books");
+This means that the same instance of the ProductCatalog WS.
+
+09 - Service First and Contract First WSs
+---------------------------------------------------
+The @WebService is enough for simple scenarios.
+When writing Java code, we write the contract (Interface) before writing the implementation.
+This ensures that the client code does not change when we change the implementation, as the interface itself is unchanged.
+The interface in a SOAP infrastructure is the WSDL. The client code refers to the WSDL to know what the WS is providing.
+Since we are locking the WSDL, the client code will not change if the WS code is changing.
+
+For simple WSs, when annotating our WS implementation with @WebService, the WSDL is automatically generated for us.
+If we change the name of a WS method, will impact the automatically generated WSDL. Hence the client code will be out-dated as the names of the methods have changed.
+We need to lock the WSDL. We must write the WSDL first and then from the WSDL generate the WS Java class.
+
+We have two ways of writing WS: service first (code first - simple scenarios) and contract first (WSDL is written first and generate the business service out of it).
+
+10 - Understanding the WSDL
+----------------------------
+We use the WSDL as an analogy of an interface in XML format (readable by any platform).
+
+As we saw previously, we have defined 3 methods in our WS. We will focus on the getProductCategories() method to understand the ProductCatalog WS WSDL.
+First of all we have to deactivate the other two service methods: @WebMethod(exclude=true). 
+This ensures that GlassFish does not publish the web methods.
+
+<definitions targetNamespace="http://service.testmart.yovan.com/" name="ProductCatalogService">
+    <types>
+        <xsd:schema>
+            <xsd:import namespace="http://service.testmart.yovan.com/" schemaLocation="http://yovan:8888/TestMart/ProductCatalogService?xsd=1"/>
+        </xsd:schema>
+    </types>
+    <message name="getProductCategories">
+        <part name="parameters" element="tns:getProductCategories"/>
+    </message>
+    <message name="getProductCategoriesResponse">
+        <part name="parameters" element="tns:getProductCategoriesResponse"/>
+    </message>
+    <portType name="ProductCatalog">
+        <operation name="getProductCategories">
+            <input wsam:Action="http://service.testmart.yovan.com/ProductCatalog/getProductCategoriesRequest" message="tns:getProductCategories"/>
+            <output wsam:Action="http://service.testmart.yovan.com/ProductCatalog/getProductCategoriesResponse" message="tns:getProductCategoriesResponse"/>
+        </operation>
+    </portType>
+    <binding name="ProductCatalogPortBinding" type="tns:ProductCatalog">
+        <soap:binding transport="http://schemas.xmlsoap.org/soap/http" style="document"/>
+        <operation name="getProductCategories">
+            <soap:operation soapAction=""/>
+            <input>
+                <soap:body use="literal"/>
+            </input>
+            <output>
+                <soap:body use="literal"/>
+            </output>
+        </operation>
+    </binding>
+    <service name="ProductCatalogService">
+        <port name="ProductCatalogPort" binding="tns:ProductCatalogPortBinding">
+            <soap:address location="http://yovan:8888/TestMart/ProductCatalogService"/>
+        </port>
+    </service>
+</definitions>
+
+If we collapse the elements of a WSDL, we have:
+- types
+- message
+- portType
+- binding
+- service
+
+1. portType
+ - has the name of the service: ProductCatalog
+ - has an operation child with name getProductCategories: service method in our WS. 
+ This operation takes in an input (message="getProductCategories") and returns an output (message="getProductCategoriesResponse")
+
+2. types
+ - Defines the custom types which are references to the input and output are references to these data types.
+ - In an operation there is only one input and one output. 
+	
+ If there is more than one arguments to a service method, these arguments are bundled in a message.
+ In our case the input of the getProductCategories operation is of the message getProductCategories.
+ The output of the getProductCategories operation is of the message getProductCategoriesResponse.
+	
+3. These messages are defined separately.
+
+Essentially there are types defined for all custom types and messages defined which consist of different types. An operation has a message for its input and another one for its output.
+
+4. Binding- A binding is how the WS accepts requests and gives response.
+ - the soap:binding child says that the transport is HTTP, which means that this WS accepts SOAP requests over HTTP. There are different ways in which WS accept requests - in our case it is HTTP.
+ - We will see he operation child later.
+ 
+ 5. The service is a list of ports - how the WS is accessed. The ProductCatalog service defines a ProdructCatalogPort, which is the location where the WS can be accessed. The port has a binding as defined previously.
+ 
+ But how does GlassFish generates this XML?
+ 1. When GlassFish sees a class annotated with @WebService, it creates a service and a port for it.
+ 2. Creates a binding to tell how the WS should be called.
+ 3. GlassFish looks in this port for methods annotated with @WebMethod and creates operations for them. 
+ 4. The method name is the same as the operation name.
+ 5. Irrespective of whether an operation has input arguments or not, it creates an input message and an output message for each operation.
+ 6. The input message consist of as many types as required. 
+ 7. Each message has a type. List<String> is a type, hence a type is created for the output.
+ 
+ Service has a port. A port defines a binding. A binding defines a port type. A port type has operations. Each operation has an input and an output. input and output have each a message.
+ A message has as many types as there are arguments in the method.
+ 
+ As we saw previously, the defaults in the WSDL are picked up from the class names and the method names. We can customize the WSDL.
+ 
+ 
+11 - Customizing the WSDL
+--------------------------
+The WSDL file is very difficult to build by hand. In the contract first (WSDL first) approach, it is best to write a throw-away Java class first, which would give us a good starting point.
+We can then generate the WSDL, tweak the defaults and then generate the final WS to match the WSDL.
+
+Let's customize the defaults. Note: We are still doing code first approach (Not WSDL first).
+
+1. To override the ProductCatalog service name to TestMartCatalog we use: @WebService (name="TestMartCatalog")
+This changes the portType to TestMartCatalog. This ensures that although we change the name of the class the WSDL will not change.
+
+2. @WebService(name = "TestMartCatalog", portName = "TestMartCatalogPortName", serviceName = "TestMartCatalogService") changes the portName and the serviceName defaults.
+If we try to access the WSDL using the previous URL http://127.0.0.1:8888/TestMart/ProductCatalogService?WSDL we get a 404 status, implying hat the URL is no longer valid.
+The WSDL has changed to the following URL : http://127.0.0.1:8888/TestMart/TestMartCatalogService?WSDL. The service name is how we access the service.
+
+3. The attribute targetNameSpace is an analogy to the package grouping in Java. In the XML world a name space is a grouping of the XML types together. 
+All elements of the WSDL i.e types, message, portType, binding and service are grouped have their root element the definitions tag, which has a targetNameSpace.
+This targetNameSpace attribute ensures that all the WSDL elements are not overridden by another XML of the same types. 
+Hence all the elements of a given WSDL are grouped in a "package", called the name space. 
+For example this ensures that the getProductCategories message is unique by reference to its name space parent. The name space here is http://service.testmart.yovan.com/.
+This is derived from the package name.
+targetNamespace = "https://www.testmart.com" overrides the name space.
+
+4. method level:  @WebMethod(exclude = true) to exclude methods of a service.
+
+5. @WebMethod(exclude = false, action = "fetch_categories", operationName = "fetchCategories")
+ - operation name by default takes the method name.
+ - the <soap:action soapAction = "fetch_categories">
+ - <operation name="fetchCategories">
+    	<input wsam:Action="fetch_categories" message="tns:fetchCategories"/>
+    	<output wsam:Action="https://www.testmart.com/TestMartCatalog/fetchCategoriesResponse" message="tns:fetchCategoriesResponse"/>
+   </operation>
+
+
+12 - Schema Types and Binding Styles
+-------------------------------------
+The ShopInfo service has a getShopInfo(String property) service method, which gives a response about the information of the shop based on the property.
+- WSDL: http://127.0.0.1:8888/TestMart/ShopInfoService?WSDL
+- Types as seen previously are the data types required by the WSDL.
+For our String getShopInfo(String property) service method, we can see that the types of parameter(input) and return(output) are both Strings.
+In our WSDL we have: 
+
+<types>
+    <xsd:schema>
+        <xsd:import namespace="http://service.testmart.yovan.com/" schemaLocation="http://127.0.0.1:8888/TestMart/ShopInfoService?xsd=1"/>
+    </xsd:schema>
+</types>
+
+- The data types are being imported from a schema, from a specific location: schemaLocation="http://127.0.0.1:8888/TestMart/ShopInfoService?xsd=1"
+The types are not located in the WSDL file. They are being imported from another XML: http://127.0.0.1:8888/TestMart/ShopInfoService?xsd=1
+
+<xs:schema version="1.0" targetNamespace="http://service.testmart.yovan.com/">
+    <xs:element name="getShopInfo" type="tns:getShopInfo"/>
+    <xs:element name="getShopInfoResponse" type="tns:getShopInfoResponse"/>
+    <xs:complexType name="getShopInfo">
+        <xs:sequence>
+            <xs:element name="arg0" type="xs:string" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="getShopInfoResponse">
+        <xs:sequence>
+            <xs:element name="return" type="xs:string" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+</xs:schema>
+
+- The schema file contains two data types: getShopInfo (input type) and getShopInfoResponse(output type).
+The xs:element name="getShopInfoResponse" is only the type declaration. This data type detailed definition is done in xs:complexType.
+
+<xs:element name="arg0" type="xs:string" minOccurs="0"/> => Input first element by default is arg0
+<xs:element name="return" type="xs:string" minOccurs="0"/> => Output name is called return
+- this means that the first argument is a string and can have 0 or more occurrence. 
+But if we see the definition of our method we can conclude that we must pass in a String and return a String. 
+The zero occurrence accommodates for NULL.
+As seen previously, the input and output messages are referencing to the types, which in turn are defined in the XSD schema.
+
+It is quite complex with all this references. We can override the defaults: @SOAPBinding
+As seen previously the binding states what is the input and output of the WS. 
+
+In out web service, we no longer have the <types> values. These are now embedded in the message <part> tags. There are no external XSD now.
+The SOAP binding shows that the style is RPC, instead of the default DOCUMENT.
+STYLE.DOCUMENT means that a new XSD document is created for the type.
+STYLE.RPC means that the types are embedded in-line - no schema is generated for types.
+
+-  To change the default input part name (arg0) and default output part name of our web service method: 
+	@WebMethod
+	@WebResult(partName = "lookupOutput")
+	public String getShopInfo(
+			@WebParam(partName = "lookupInput") String property) {}
+			
+We used the name lookup because we are querying information about the shop.
+
+STYLE.DOCUMENT is used to define the data types in an external XSD. It is very useful as frameworks can validate the data types are being input and output.
+With in-line data types STYLE.RPC we don't have this advantage.
+
+13 - Service Interface and Custom Types
+---------------------------------------
+When we have considerate changes in our code, for example if we have a method List<String> getProducts() and want to change the return type, for example List<Product> getProducts(),
+typically the WSDL is changed automatically, and hence the client code must change.
+
+What we normally do is to create a new version of the method service.
+
+The response using the Tester: http://yovan:8888/TestMart/TestMartCatalogService?Tester
+
+<?xml version="1.0" encoding="UTF-8"?><S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/" xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
+    <SOAP-ENV:Header/>
+    <S:Body>
+        <ns2:getProductsv2Response xmlns:ns2="https://www.testmart.com">
+            <return>
+                <name>Book 1</name>
+                <price>99.9</price>
+                <sku>12347</sku>
+            </return>
+            <return>
+                <name>Book 2</name>
+                <price>99.9</price>
+                <sku>45895</sku>
+            </return>
+            <return>
+                <name>Book 3</name>
+                <price>19.9</price>
+                <sku>78945</sku>
+            </return>
+            <return>
+                <name>Book 4</name>
+                <price>99.9</price>
+                <sku>23569</sku>
+            </return>
+        </ns2:getProductsv2Response>
+    </S:Body>
+</S:Envelope>
+
+Note: Previously we could not use annotations directly in our implementations of our WS. 
+Our WS should implement interfaces and the annotations were placed in the interface itself.
+The specifications have changed. Now one class is enough - we don't need to create an interface to use WS.
+
+This interface is known as the service end point interface (SEI).
+
+Note: To make our implementation a WS, we must annotate the class with @WebService(endpointInterface = "com.yovan.testmart.service.ProductCatalogInterface", portName = "TestMartCatalogPortName", serviceName = "TestMartCatalogService")
+
+- We must also provide the end point interface to tell the SOAP framework which interface it should use in our WS implementation. 
+- The default port name and service name can be overridden in the WS implementation.
+- The targetNameSpace and name of the WS can be defined in the interface: @WebService(name = "TestMartCatalog", targetNamespace = "https://www.testmart.com")
+
+If we are using only one class for our WS:
+1. We can hide our WS by using the @WebMethod(exclude = false) or 
+2. by making our method private. Only public WS methods are published.
+
+But when we are using interfaces, only the public methods in the interface are exposed, despite that there can be public methods 
+(which are not exposed) in the implementation.
+
+JAXB - Java Architecture for XML binding is a Java API that helps us bind different parts of a Java object to different parts of an XML structure.
+
+We can change the defaults of our Java class by using JAXB annotations. When we provide our object to the JAXB runtime, the latter knows how to convert it to XML, based on the annotation configuration.
+
+15 - Using JAXB Annotations Part 2
+-----------------------------------
+1. @XmlRootElement(name = "Product")
+   @XmlType(propOrder = { "price", "sku", "name" })
+   public class Product {...}
+
+	@XmlElement(name = "ProductName", nillable = false, defaultValue = "No Name")
+	public String getName() {
+		return name;
+	}
+
+2. We must have a default constructor, JAXB does not know which arguments to pass to our objects when generating them - XML to Java object conversion. 
+First of all the object is instantiated in memory (using no-argument constructor) and then the values are set.
+
+Here is the output: 
+<?xml version="1.0" encoding="UTF-8"?><S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/" xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
+    <SOAP-ENV:Header/>
+    <S:Body>
+        <ns2:getProductsv2Response xmlns:ns2="https://www.testmart.com">
+            <return>
+                <ProductName>99.9</ProductName>
+                <SKU>12347</SKU>
+                <ProductName>Book 1</ProductName>
+            </return>
+            <return>
+                <ProductName>89.9</ProductName>
+                <SKU>45895</SKU>
+                <ProductName>Book 2</ProductName>
+            </return>
+            <return>
+                <ProductName>19.9</ProductName>
+                <SKU>78945</SKU>
+                <ProductName>Book 3</ProductName>
+            </return>
+            <return>
+                <ProductName>99.0</ProductName>
+                <SKU>23569</SKU>
+                <ProductName>Book 4</ProductName>
+            </return>
+        </ns2:getProductsv2Response>
+    </S:Body>
+</S:Envelope>
+
+Note: The objects roots are by default created as return. As seen previously, this default naming can be changed using @WebResult(name="modifiedName")
+
+	@WebMethod
+	@WebResult(name = "Product")
+	public abstract List<Product> getProductsv2(String category);
+	
+16 - Handling Faults
+---------------------
+In our WS methods, there can be cases where an exception is thrown an we never get the response. 
+
+For example in the ShopInfo service our web method may throw an exception, as we made it throw InvalidInputException : 
+
+	@WebMethod
+	@WebResult(partName = "lookupOutput")
+	public String getShopInfo(@WebParam(partName = "lookupInput") String property) throws InvalidInputException {...}
+			
+
+<portType name="ShopInfo">
+    <operation name="getShopInfo">
+        <input wsam:Action="http://service.testmart.yovan.com/ShopInfo/getShopInfoRequest" message="tns:getShopInfo"/>
+        <output wsam:Action="http://service.testmart.yovan.com/ShopInfo/getShopInfoResponse" message="tns:getShopInfoResponse"/>
+        <fault message="tns:InvalidInputException" name="InvalidInputException" wsam:Action="http://service.testmart.yovan.com/ShopInfo/getShopInfo/Fault/InvalidInputException"/>
+    </operation>
+</portType>
+
+As we can see in the XML, the fault message is referencing to InvalidInputException: wsam:Action="http://service.testmart.yovan.com/ShopInfo/getShopInfo/Fault/InvalidInputException".
+Just like the input and output messages reference to types declared in the XSD schema, we have the fault message type declared in the XSD schema.
+
+<xs:element name="InvalidInputException" type="tns:InvalidInputException"/>
+<xs:complexType name="InvalidInputException">
+    <xs:sequence>
+        <xs:element name="faultInfo" type="xs:string" minOccurs="0"/>
+        <xs:element name="message" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+</xs:complexType>
+
+If we provide a valid input to the method: http://yovan:8888/TestMart/ShopInfoService?Tester, we get a valid response.
+With an invalid input we should get an XML with a fault element, fault code, fault string, our object with the attributes message and faultInfo.
+
+But GlassFish shows us a stack trace - maybe that it is handier for a developer. 
+In production we would rather want an XML with the fault element (platform independent error handling) than a Java stack trace.
+The GlassFish Tester has its limitations. For error handling we can use other tools.
+
+17 - Using SoapUI
+-------------------
+To test web services not available on our local GlassFish server we can use SoapUI download-able or the SoapUI Eclipse plug-in.
+The SOAP request done by a client to a WS is always a POST request and in the POST body we have the XML.
+We could say that a SOAP request is just a POST with an XML body.
+When we provide the WSDL to the external tools like SOAP UI, they generate the XML for us. 
+
+How to test:
+1. Create a new SOAP project in SoapUI.
+2. Give it a project name: TestMartSoapTest
+3. Provide the WSDL location: http://yovan:8888/TestMart/ShopInfoService?WSDL
+4. The Create Requests check-box should be checked. This enables SoapUI to generate the operations (methods) by analyzing the WSDL. For example getShopInfo is the operation and Request1 is an example of XML request generated for us.
+
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ser="http://service.testmart.yovan.com/">
+   <soapenv:Header/>
+   <soapenv:Body>
+      <ser:getShopInfo>
+         <lookupInput>since</lookupInput>
+      </ser:getShopInfo>
+   </soapenv:Body>
+</soapenv:Envelope>
+
+We have to replace the question mark by an input (since, shopName, invalid, etc).
+
+
+The SOAP response: 
+<S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/">
+   <S:Body>
+      <ns2:getShopInfoResponse xmlns:ns2="http://service.testmart.yovan.com/">
+         <lookupOutput>since 2012</lookupOutput>
+      </ns2:getShopInfoResponse>
+   </S:Body>
+</S:Envelope>
+
+SOAP invalid input response:
+<S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/">
+   <S:Body>
+      <S:Fault xmlns:ns4="http://www.w3.org/2003/05/soap-envelope">
+         <faultcode>S:Server</faultcode>
+         <faultstring>Invalid Input</faultstring>
+         <detail>
+            <ns2:InvalidInputException xmlns:ns2="http://service.testmart.yovan.com/">
+               <faultInfo>invalid is not a valid input</faultInfo>
+               <message>Invalid Input</message>
+            </ns2:InvalidInputException>
+         </detail>
+      </S:Fault>
+   </S:Body>
+</S:Envelope>
+
+
+18 - Using Web Service Explorer
+--------------------------------
+Note: This feature is not compatible with Java 8. TODO: test java -version on terminal.
+
+1. On launch we see the UDDI Main page in the Navigator.
+2. Click on the WSDL Page icon in the upper right of the explorer.
+3. Click on WSDL Main and paste the WSDL URL.
+4. We can see the different operations in our WS.
+5. To test a particular operation, we click on its name, enter any arguments to the method if any.
+
+6. We can also import the WSDL to workbench. This just downloads the WSDL file on our computer. On clicking on the WSDL file, a graphical representation of the WSDL is opened by the Web Service Explorer plug-in.
+We can graphically browse the WSDL for the operations and types.
+This is very handy for WSDL files which are very bulky.
+
+
+19 - Using Endpoint
+---------------------
+We can test JAS-WS wed services without using a server. While developing this is handy as we don't have to deploy our services on a server every time we make a change.
+The JDK itself provides support for WS. 
+TestMartPublisher is a POJO with a main.
+Endpoint.publish("http://Yovan:9999/productCatalog", new ProductCatalog());
+ - The first argument is the address of the service: localhost (local machine) with a port not being currently used. We need an instance of a WS class (annotated with @WebService)- ProductCatalog.
+ - We can access the WS in a browser. We can also see the WSDL.
+ - The standard tells us which annotations to use. The implementation of the WS for GlassFish is Metro, bundled with it. 
+ Metro is also bundled in JDK.
+ - There are some limitations to the Endpoint model. It is single threaded - a second request has to wait until the first request has stopped its execution.
+ 
+20 - wsimport Revisited
+------------------------
+Let's go back to the consumption of WS on the client side.
+Previously we used wsimport to generate client stubs, which hide the complex code to call a web service. 
+We call a method on the generated class and then that class gives the WS call and gives back the response.
+Hence calling a WS is as simple as calling a method on that generated class.
+There are some options provided while using wsimport.
+
+wsimport [options] http://webapp.com/ws?wsdl
+wsimport [options] myWsdl.wsdl for local file
+
+1. wsimport -d  directoryPath wsdlPath > to place our generated classes
+2. wsimport -keep wsdlPath > to keep the src files
+3. wsimport -s directoryPath wsdlPath > directory to save the src files > -s automatically calls -keep
+4. wsimport -verbose wsdlPath > detailed output
+5. wsimport -quite wsdlPath > no details
+
+the above options do not affect the generated code.
+
+The following options below do affect the generated code:
+1. wsimport -p com.yovan.generated > By default the package name is picked from the WSDL output.
+
+2. The types names become a class name in the generated source files. But some names which are valid in XSD but not valid in Java.
+We may have two classes with same name but different XSD name space. We should use our binding files to override the names so that we do not have conflicts.
+ wsimport -b bindingFile.xml wsdlPath
+
+
+
+
+
+
